@@ -15,7 +15,7 @@ return {
     {
       name = "RAYLIB_VERSION_MINOR",
       type = "INT",
-      value = 1,
+      value = 5,
       description = ""
     },
     {
@@ -27,7 +27,7 @@ return {
     {
       name = "RAYLIB_VERSION",
       type = "STRING",
-      value = "5.1-dev",
+      value = "5.5-dev",
       description = ""
     },
     {
@@ -850,12 +850,22 @@ return {
         {
           type = "unsigned char *",
           name = "boneIds",
-          description = "Vertex bone ids, max 255 bone ids, up to 4 bones influence by vertex (skinning)"
+          description = "Vertex bone ids, max 255 bone ids, up to 4 bones influence by vertex (skinning) (shader-location = 6)"
         },
         {
           type = "float *",
           name = "boneWeights",
-          description = "Vertex bone weight, up to 4 bones influence by vertex (skinning)"
+          description = "Vertex bone weight, up to 4 bones influence by vertex (skinning) (shader-location = 7)"
+        },
+        {
+          type = "Matrix *",
+          name = "boneMatrices",
+          description = "Bones animated transformation matrices"
+        },
+        {
+          type = "int",
+          name = "boneCount",
+          description = "Number of bones"
         },
         {
           type = "unsigned int",
@@ -1058,7 +1068,7 @@ return {
         {
           type = "Vector3",
           name = "direction",
-          description = "Ray direction"
+          description = "Ray direction (normalized)"
         }
       }
     },
@@ -2518,6 +2528,21 @@ return {
           name = "SHADER_LOC_MAP_BRDF",
           value = 25,
           description = "Shader location: sampler2d texture: brdf"
+        },
+        {
+          name = "SHADER_LOC_VERTEX_BONEIDS",
+          value = 26,
+          description = "Shader location: vertex attribute: boneIds"
+        },
+        {
+          name = "SHADER_LOC_VERTEX_BONEWEIGHTS",
+          value = 27,
+          description = "Shader location: vertex attribute: boneWeights"
+        },
+        {
+          name = "SHADER_LOC_BONE_MATRICES",
+          value = 28,
+          description = "Shader location: array of matrices uniform: boneMatrices"
         }
       }
     },
@@ -3158,12 +3183,12 @@ return {
     },
     {
       name = "ToggleFullscreen",
-      description = "Toggle window state: fullscreen/windowed (only PLATFORM_DESKTOP)",
+      description = "Toggle window state: fullscreen/windowed [resizes monitor to match window resolution] (only PLATFORM_DESKTOP)",
       returnType = "void"
     },
     {
       name = "ToggleBorderlessWindowed",
-      description = "Toggle window state: borderless windowed (only PLATFORM_DESKTOP)",
+      description = "Toggle window state: borderless windowed [resizes window to match monitor resolution] (only PLATFORM_DESKTOP)",
       returnType = "void"
     },
     {
@@ -3564,8 +3589,8 @@ return {
       }
     },
     {
-      name = "IsShaderReady",
-      description = "Check if a shader is ready",
+      name = "IsShaderValid",
+      description = "Check if a shader is valid (loaded on GPU)",
       returnType = "bool",
       params = {
         {type = "Shader", name = "shader"}
@@ -4043,6 +4068,14 @@ return {
       returnType = "const char *"
     },
     {
+      name = "MakeDirectory",
+      description = "Create directories (including full path requested), returns 0 on success",
+      returnType = "int",
+      params = {
+        {type = "const char *", name = "dirPath"}
+      }
+    },
+    {
       name = "ChangeDirectory",
       description = "Change working directory, return true on success",
       returnType = "bool",
@@ -4076,7 +4109,7 @@ return {
     },
     {
       name = "LoadDirectoryFilesEx",
-      description = "Load directory filepaths with extension filtering and recursive directory scan",
+      description = "Load directory filepaths with extension filtering and recursive directory scan. Use 'DIR' in the filter string to include directories in the result",
       returnType = "FilePathList",
       params = {
         {type = "const char *", name = "basePath"},
@@ -4155,6 +4188,33 @@ return {
       params = {
         {type = "const unsigned char *", name = "data"},
         {type = "int *", name = "outputSize"}
+      }
+    },
+    {
+      name = "ComputeCRC32",
+      description = "Compute CRC32 hash code",
+      returnType = "unsigned int",
+      params = {
+        {type = "unsigned char *", name = "data"},
+        {type = "int", name = "dataSize"}
+      }
+    },
+    {
+      name = "ComputeMD5",
+      description = "Compute MD5 hash code, returns static int[4] (16 bytes)",
+      returnType = "unsigned int *",
+      params = {
+        {type = "unsigned char *", name = "data"},
+        {type = "int", name = "dataSize"}
+      }
+    },
+    {
+      name = "ComputeSHA1",
+      description = "Compute SHA1 hash code, returns static int[5] (20 bytes)",
+      returnType = "unsigned int *",
+      params = {
+        {type = "unsigned char *", name = "data"},
+        {type = "int", name = "dataSize"}
       }
     },
     {
@@ -4517,7 +4577,7 @@ return {
     },
     {
       name = "GetGestureHoldDuration",
-      description = "Get gesture hold time in milliseconds",
+      description = "Get gesture hold time in seconds",
       returnType = "float"
     },
     {
@@ -4581,7 +4641,7 @@ return {
     },
     {
       name = "DrawPixel",
-      description = "Draw a pixel",
+      description = "Draw a pixel using geometry [Can be slow, use with care]",
       returnType = "void",
       params = {
         {type = "int", name = "posX"},
@@ -4591,7 +4651,7 @@ return {
     },
     {
       name = "DrawPixelV",
-      description = "Draw a pixel (Vector version)",
+      description = "Draw a pixel using geometry (Vector version) [Can be slow, use with care]",
       returnType = "void",
       params = {
         {type = "Vector2", name = "position"},
@@ -4697,8 +4757,8 @@ return {
         {type = "int", name = "centerX"},
         {type = "int", name = "centerY"},
         {type = "float", name = "radius"},
-        {type = "Color", name = "color1"},
-        {type = "Color", name = "color2"}
+        {type = "Color", name = "inner"},
+        {type = "Color", name = "outer"}
       }
     },
     {
@@ -4835,8 +4895,8 @@ return {
         {type = "int", name = "posY"},
         {type = "int", name = "width"},
         {type = "int", name = "height"},
-        {type = "Color", name = "color1"},
-        {type = "Color", name = "color2"}
+        {type = "Color", name = "top"},
+        {type = "Color", name = "bottom"}
       }
     },
     {
@@ -4848,8 +4908,8 @@ return {
         {type = "int", name = "posY"},
         {type = "int", name = "width"},
         {type = "int", name = "height"},
-        {type = "Color", name = "color1"},
-        {type = "Color", name = "color2"}
+        {type = "Color", name = "left"},
+        {type = "Color", name = "right"}
       }
     },
     {
@@ -4858,10 +4918,10 @@ return {
       returnType = "void",
       params = {
         {type = "Rectangle", name = "rec"},
-        {type = "Color", name = "col1"},
-        {type = "Color", name = "col2"},
-        {type = "Color", name = "col3"},
-        {type = "Color", name = "col4"}
+        {type = "Color", name = "topLeft"},
+        {type = "Color", name = "bottomLeft"},
+        {type = "Color", name = "topRight"},
+        {type = "Color", name = "bottomRight"}
       }
     },
     {
@@ -5307,16 +5367,6 @@ return {
       }
     },
     {
-      name = "LoadImageSvg",
-      description = "Load image from SVG file data or string with specified size",
-      returnType = "Image",
-      params = {
-        {type = "const char *", name = "fileNameOrString"},
-        {type = "int", name = "width"},
-        {type = "int", name = "height"}
-      }
-    },
-    {
       name = "LoadImageAnim",
       description = "Load image sequence from file (frames appended to image.data)",
       returnType = "Image",
@@ -5360,8 +5410,8 @@ return {
       returnType = "Image"
     },
     {
-      name = "IsImageReady",
-      description = "Check if an image is ready",
+      name = "IsImageValid",
+      description = "Check if an image is valid (data and parameters)",
       returnType = "bool",
       params = {
         {type = "Image", name = "image"}
@@ -5519,6 +5569,15 @@ return {
       params = {
         {type = "Image", name = "image"},
         {type = "Rectangle", name = "rec"}
+      }
+    },
+    {
+      name = "ImageFromChannel",
+      description = "Create an image from a selected channel of another image (GRAYSCALE)",
+      returnType = "Image",
+      params = {
+        {type = "Image", name = "image"},
+        {type = "int", name = "selectedChannel"}
       }
     },
     {
@@ -6116,8 +6175,8 @@ return {
       }
     },
     {
-      name = "IsTextureReady",
-      description = "Check if a texture is ready",
+      name = "IsTextureValid",
+      description = "Check if a texture is valid (loaded in GPU)",
       returnType = "bool",
       params = {
         {type = "Texture2D", name = "texture"}
@@ -6132,8 +6191,8 @@ return {
       }
     },
     {
-      name = "IsRenderTextureReady",
-      description = "Check if a render texture is ready",
+      name = "IsRenderTextureValid",
+      description = "Check if a render texture is valid (loaded in GPU)",
       returnType = "bool",
       params = {
         {type = "RenderTexture2D", name = "target"}
@@ -6369,6 +6428,16 @@ return {
       }
     },
     {
+      name = "ColorLerp",
+      description = "Get color lerp interpolation between two colors, factor [0.0f..1.0f]",
+      returnType = "Color",
+      params = {
+        {type = "Color", name = "color1"},
+        {type = "Color", name = "color2"},
+        {type = "float", name = "factor"}
+      }
+    },
+    {
       name = "GetColor",
       description = "Get Color structure from hexadecimal value",
       returnType = "Color",
@@ -6420,7 +6489,7 @@ return {
     },
     {
       name = "LoadFontEx",
-      description = "Load font from file with extended parameters, use NULL for codepoints and 0 for codepointCount to load the default character setFont",
+      description = "Load font from file with extended parameters, use NULL for codepoints and 0 for codepointCount to load the default character set, font size is provided in pixels height",
       returnType = "Font",
       params = {
         {type = "const char *", name = "fileName"},
@@ -6453,8 +6522,8 @@ return {
       }
     },
     {
-      name = "IsFontReady",
-      description = "Check if a font is ready",
+      name = "IsFontValid",
+      description = "Check if a font is valid (font data loaded, WARNING: GPU texture not checked)",
       returnType = "bool",
       params = {
         {type = "Font", name = "font"}
@@ -7133,8 +7202,8 @@ return {
       }
     },
     {
-      name = "IsModelReady",
-      description = "Check if a model is ready",
+      name = "IsModelValid",
+      description = "Check if a model is valid (loaded in GPU, VAO/VBOs)",
       returnType = "bool",
       params = {
         {type = "Model", name = "model"}
@@ -7205,6 +7274,30 @@ return {
       }
     },
     {
+      name = "DrawModelPoints",
+      description = "Draw a model as points",
+      returnType = "void",
+      params = {
+        {type = "Model", name = "model"},
+        {type = "Vector3", name = "position"},
+        {type = "float", name = "scale"},
+        {type = "Color", name = "tint"}
+      }
+    },
+    {
+      name = "DrawModelPointsEx",
+      description = "Draw a model as points with extended parameters",
+      returnType = "void",
+      params = {
+        {type = "Model", name = "model"},
+        {type = "Vector3", name = "position"},
+        {type = "Vector3", name = "rotationAxis"},
+        {type = "float", name = "rotationAngle"},
+        {type = "Vector3", name = "scale"},
+        {type = "Color", name = "tint"}
+      }
+    },
+    {
       name = "DrawBoundingBox",
       description = "Draw bounding box (wires)",
       returnType = "void",
@@ -7221,7 +7314,7 @@ return {
         {type = "Camera", name = "camera"},
         {type = "Texture2D", name = "texture"},
         {type = "Vector3", name = "position"},
-        {type = "float", name = "size"},
+        {type = "float", name = "scale"},
         {type = "Color", name = "tint"}
       }
     },
@@ -7463,8 +7556,8 @@ return {
       returnType = "Material"
     },
     {
-      name = "IsMaterialReady",
-      description = "Check if a material is ready",
+      name = "IsMaterialValid",
+      description = "Check if a material is valid (shader assigned, map textures loaded in GPU)",
       returnType = "bool",
       params = {
         {type = "Material", name = "material"}
@@ -7541,6 +7634,16 @@ return {
       params = {
         {type = "Model", name = "model"},
         {type = "ModelAnimation", name = "anim"}
+      }
+    },
+    {
+      name = "UpdateModelAnimationBoneMatrices",
+      description = "Update model animation mesh bone matrices (Note GPU skinning does not work on Mac)",
+      returnType = "void",
+      params = {
+        {type = "Model", name = "model"},
+        {type = "ModelAnimation", name = "anim"},
+        {type = "int", name = "frame"}
       }
     },
     {
@@ -7672,8 +7775,8 @@ return {
       }
     },
     {
-      name = "IsWaveReady",
-      description = "Checks if wave data is ready",
+      name = "IsWaveValid",
+      description = "Checks if wave data is valid (data loaded and parameters)",
       returnType = "bool",
       params = {
         {type = "Wave", name = "wave"}
@@ -7704,8 +7807,8 @@ return {
       }
     },
     {
-      name = "IsSoundReady",
-      description = "Checks if a sound is ready",
+      name = "IsSoundValid",
+      description = "Checks if a sound is valid (data loaded and buffers initialized)",
       returnType = "bool",
       params = {
         {type = "Sound", name = "sound"}
@@ -7894,8 +7997,8 @@ return {
       }
     },
     {
-      name = "IsMusicReady",
-      description = "Checks if a music stream is ready",
+      name = "IsMusicValid",
+      description = "Checks if a music stream is valid (context and buffers initialized)",
       returnType = "bool",
       params = {
         {type = "Music", name = "music"}
@@ -8020,8 +8123,8 @@ return {
       }
     },
     {
-      name = "IsAudioStreamReady",
-      description = "Checks if an audio stream is ready",
+      name = "IsAudioStreamValid",
+      description = "Checks if an audio stream is valid (buffers initialized)",
       returnType = "bool",
       params = {
         {type = "AudioStream", name = "stream"}
